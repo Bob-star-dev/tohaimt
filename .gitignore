@@ -1,0 +1,13 @@
+# IDE
+.kiro/
+.kimchi/
+
+# Build output
+build/
+*.bin
+*.elf
+*.map
+
+# OS
+.DS_Store
+Thumbs.db

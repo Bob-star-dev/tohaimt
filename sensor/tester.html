@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ScentraVN - Smartwatch Tester</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:system-ui,sans-serif;background:#0a0a0f;color:#fff;min-height:100vh;padding:20px}
+h1{text-align:center;margin-bottom:20px;color:#07ff}
+.controls{text-align:center;margin-bottom:20px}
+button{padding:10px 24px;border:none;border-radius:8px;font-size:14px;cursor:pointer;margin:0 5px}
+#btnConnect{background:#07e0;color:#000}
+#btnDisconnect{background:#f800;color:#fff}
+button:disabled{opacity:.4;cursor:not-allowed}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;max-width:1000px;margin:0 auto}
+.card{background:#1a1a2e;border-radius:12px;padding:20px;border:1px solid #333}
+.card h2{font-size:13px;color:#888;text-transform:uppercase;margin-bottom:12px}
+.value{font-size:42px;font-weight:700}
+.unit{font-size:14px;color:#888;margin-left:4px}
+.sub{font-size:14px;color:#666;margin-top:8px}
+.ok{color:#07e0}.bad{color:#f800}.warn{color:#fe60}.accent{color:#07ff}
+.status{text-align:center;margin:16px 0;font-size:13px;color:#666}
+#log{max-width:1000px;margin:20px auto 0;background:#111;border-radius:8px;padding:12px;font-family:monospace;font-size:12px;max-height:200px;overflow-y:auto;color:#0f0}
+.indicator{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px}
+.on{background:#07e0}.off{background:#444}
+.chart-card{max-width:1000px;margin:16px auto 0;background:#1a1a2e;border-radius:12px;padding:20px;border:1px solid #333}
+.chart-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px}
+.chart-card h2{font-size:13px;color:#888;text-transform:uppercase}
+#hrNow,#spNow{font-size:13px;color:#666}
+#hrNow b{color:#f55;font-size:18px}
+#spNow b{color:#0cf;font-size:18px}
+#hrChart,#spChart{width:100%;height:auto;display:block}
+</style>
+</head>
+<body>
+<h1>ScentraVN Smartwatch Tester</h1>
+<div class="controls">
+<button id="btnConnect" onclick="connect()">🔌 Connect Serial</button>
+<button id="btnDisconnect" onclick="disconnect()" disabled>Disconnect</button>
+</div>
+<div class="status" id="status">Klik Connect untuk menghubungkan ke smartwatch via USB</div>
+
+<div class="grid">
+<div class="card">
+<h2>❤️ Heart Rate</h2>
+<div class="value" id="hr">--</div>
+<div class="sub">bpm</div>
+</div>
+<div class="card">
+<h2>🫁 SpO2</h2>
+<div class="value" id="spo2">--</div>
+<div class="sub">%</div>
+</div>
+<div class="card">
+<h2>👆 Finger</h2>
+<div class="value"><span class="indicator" id="fngDot"></span><span id="fng">--</span></div>
+<div class="sub">MAX30102 contact</div>
+</div>
+<div class="card">
+<h2>🏃 Activity</h2>
+<div class="value" id="act">--</div>
+<div class="sub">Steps: <span id="steps">0</span></div>
+</div>
+<div class="card">
+<h2>😴 Sleep</h2>
+<div class="value" id="slp">--</div>
+<div class="sub">Durasi: <span id="slpmin">0</span> min | Score: <span id="slps">0</span>/100</div>
+</div>
+<div class="card">
+<h2>🖐 MPU Still</h2>
+<div class="value"><span class="indicator" id="stlDot"></span><span id="stl">--</span></div>
+<div class="sub">Quality: <span id="slpq">0</span> | Buffer: <span id="buf">0</span></div>
+</div>
+</div>
+
+<div class="chart-card">
+  <div class="chart-head">
+    <h2>❤️ Heart Rate — Realtime</h2>
+    <span id="hrNow"><b>--</b> bpm &middot; <span id="hrSpan">~30s</span></span>
+  </div>
+  <canvas id="hrChart" width="960" height="240"></canvas>
+</div>
+
+<div class="chart-card">
+  <div class="chart-head">
+    <h2>🫁 SpO2 — Realtime</h2>
+    <span id="spNow"><b>--</b> % &middot; ~30s</span>
+  </div>
+  <canvas id="spChart" width="960" height="240"></canvas>
+</div>
+
+<div id="log"></div>
+
+<script>
+let port, reader, running = false;
+
+// ---- Grafik realtime (HR & SpO2) ----
+const MAX_POINTS = 150;             // ~30 dtk @ 5 frame/dtk (frame tiap 200ms)
+
+// def: konfigurasi tiap grafik. lo/hi = rentang sumbu Y, step = jarak gridline,
+// normal = nilai yg ditandai garis hijau (zona sehat), color = warna garis,
+// nowEl = elemen <b> nilai terkini, unit utk placeholder.
+const charts = {
+  hr: { canvas: 'hrChart', nowEl: 'hrNow', label: 'HR',
+        lo: 40, hi: 180, step: 20, normal: [60, 100], color: '#f55', data: [] },
+  sp: { canvas: 'spChart', nowEl: 'spNow', label: 'SpO2',
+        lo: 85, hi: 100, step: 5, normal: [95], color: '#0cf', data: [] },
+};
+
+function pushVal(key, v) {
+  const c = charts[key];
+  c.data.push(v);
+  if (c.data.length > MAX_POINTS) c.data.shift();
+  document.querySelector('#' + c.nowEl + ' b').textContent = v > 0 ? v : '--';
+  drawChart(key);
+}
+const pushHR   = v => pushVal('hr', v);
+const pushSpo2 = v => pushVal('sp', v);
+
+function drawChart(key) {
+  const c = charts[key];
+  const cv = document.getElementById(c.canvas);
+  const ctx = cv.getContext('2d');
+  const W = cv.width, H = cv.height;
+  const padL = 36, padR = 10, padT = 10, padB = 18;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#111';
+  ctx.fillRect(0, 0, W, H);
+
+  const yFor = v => padT + plotH * (1 - (v - c.lo) / (c.hi - c.lo));
+
+  // Grid + label sumbu Y
+  ctx.font = '11px monospace';
+  ctx.textBaseline = 'middle';
+  for (let v = c.lo; v <= c.hi; v += c.step) {
+    const y = yFor(v);
+    ctx.strokeStyle = c.normal.includes(v) ? '#1e4d2b' : '#222';   // zona sehat
+    ctx.beginPath();
+    ctx.moveTo(padL, y);
+    ctx.lineTo(W - padR, y);
+    ctx.stroke();
+    ctx.fillStyle = '#555';
+    ctx.fillText(v, 6, y);
+  }
+
+  // Garis nilai (putus saat 0 / tidak ada jari)
+  if (c.data.length > 1) {
+    const dx = plotW / (MAX_POINTS - 1);
+    const clamp = v => Math.min(Math.max(v, c.lo), c.hi);
+    ctx.strokeStyle = c.color;
+    ctx.lineWidth = 2;
+    ctx.lineJoin = 'round';
+    let pen = false;
+    ctx.beginPath();
+    for (let i = 0; i < c.data.length; i++) {
+      const v = c.data[i];
+      if (v <= 0) { pen = false; continue; }   // gap
+      const x = padL + i * dx;
+      const y = yFor(clamp(v));
+      if (!pen) { ctx.moveTo(x, y); pen = true; }
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+
+    // titik nilai terakhir
+    const last = c.data[c.data.length - 1];
+    if (last > 0) {
+      ctx.fillStyle = c.color;
+      ctx.beginPath();
+      ctx.arc(padL + (c.data.length - 1) * dx, yFor(clamp(last)), 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  } else {
+    ctx.fillStyle = '#444';
+    ctx.font = '13px system-ui';
+    ctx.textAlign = 'center';
+    ctx.fillText('Menunggu data ' + c.label + '…', W / 2, H / 2);
+    ctx.textAlign = 'start';
+  }
+}
+drawChart('hr');
+drawChart('sp');
+
+async function connect() {
+  try {
+    port = await navigator.serial.requestPort();
+    await port.open({ baudRate: 115200 });
+    document.getElementById('btnConnect').disabled = true;
+    document.getElementById('btnDisconnect').disabled = false;
+    document.getElementById('status').textContent = '✅ Connected — receiving data...';
+    running = true;
+    readLoop();
+  } catch (e) {
+    document.getElementById('status').textContent = '❌ ' + e.message;
+  }
+}
+
+async function disconnect() {
+  running = false;
+  if (reader) { await reader.cancel(); reader = null; }
+  if (port) { await port.close(); port = null; }
+  document.getElementById('btnConnect').disabled = false;
+  document.getElementById('btnDisconnect').disabled = true;
+  document.getElementById('status').textContent = 'Disconnected';
+}
+
+async function readLoop() {
+  const decoder = new TextDecoderStream();
+  port.readable.pipeTo(decoder.writable);
+  reader = decoder.readable.getReader();
+  let buf = '';
+  while (running) {
+    try {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += value;
+      let lines = buf.split('\n');
+      buf = lines.pop();
+      for (const line of lines) {
+        if (line.trim()) parseLine(line.trim());
+      }
+    } catch (e) { break; }
+  }
+}
+
+function parseLine(line) {
+  const log = document.getElementById('log');
+  log.textContent += line + '\n';
+  log.scrollTop = log.scrollHeight;
+
+  const data = {};
+  line.split(',').forEach(part => {
+    const [k, v] = part.split(':');
+    if (k && v !== undefined) data[k] = v;
+  });
+
+  if (data.HR !== undefined) {
+    const hr = parseInt(data.HR);
+    const el = document.getElementById('hr');
+    el.textContent = hr || '--';
+    el.className = 'value ' + (hr >= 60 && hr <= 100 ? 'ok' : hr > 0 ? 'bad' : '');
+    pushHR(isNaN(hr) ? 0 : hr);
+  }
+  if (data.SPO2 !== undefined) {
+    const sp = parseInt(data.SPO2);
+    const el = document.getElementById('spo2');
+    el.textContent = sp || '--';
+    el.className = 'value ' + (sp >= 95 ? 'ok' : sp > 0 ? 'bad' : '');
+    pushSpo2(isNaN(sp) ? 0 : sp);
+  }
+  if (data.FNG !== undefined) {
+    const on = data.FNG === '1';
+    document.getElementById('fng').textContent = on ? 'ON' : 'OFF';
+    document.getElementById('fngDot').className = 'indicator ' + (on ? 'on' : 'off');
+  }
+  if (data.ACT !== undefined) {
+    const el = document.getElementById('act');
+    el.textContent = data.ACT;
+    el.className = 'value ' + (data.ACT === 'RUN' ? 'accent' : data.ACT === 'WALK' ? 'ok' : '');
+  }
+  if (data.STEPS !== undefined) document.getElementById('steps').textContent = data.STEPS;
+  if (data.SLP !== undefined) {
+    const sleeping = data.SLP === '1';
+    document.getElementById('slp').textContent = sleeping ? '💤 Tidur' : 'Terjaga';
+    document.getElementById('slp').className = 'value ' + (sleeping ? 'accent' : '');
+  }
+  if (data.SLPMIN !== undefined) document.getElementById('slpmin').textContent = data.SLPMIN;
+  if (data.SLPS !== undefined) document.getElementById('slps').textContent = data.SLPS;
+  if (data.SLPQ !== undefined) {
+    const q = parseInt(data.SLPQ);
+    const labels = ['Terjaga', 'Gelisah', 'Normal', 'Nyenyak'];
+    document.getElementById('slpq').textContent = labels[q] || q;
+  }
+  if (data.BUF !== undefined) document.getElementById('buf').textContent = data.BUF;
+  if (data.STL !== undefined) {
+    const on = data.STL === '1';
+    document.getElementById('stl').textContent = on ? 'DIAM' : 'GERAK';
+    document.getElementById('stlDot').className = 'indicator ' + (on ? 'on' : 'off');
+  }
+}
+</script>
+</body>
+</html>

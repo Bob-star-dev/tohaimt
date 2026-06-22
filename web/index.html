@@ -1,0 +1,1159 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Toha — Studio Artisan</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,400&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --charcoal: #1E1C1A;
+      --cream: #F7F4F0;
+      --terracotta: #C07A5F;
+      --gold: #C4A265;
+      --stone: #8B8073;
+      --linen: #EDE8E2;
+      --deep-clay: #2A2420;
+    }
+
+    *, *::before, *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--cream);
+      color: var(--charcoal);
+      overflow-x: hidden;
+      cursor: none;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ---- Noise Texture Overlay ---- */
+    .noise-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      pointer-events: none;
+      opacity: 0.035;
+      mix-blend-mode: multiply;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+    }
+
+    /* ---- Custom Cursor ---- */
+    .cursor {
+      position: fixed;
+      width: 12px;
+      height: 12px;
+      border: 1.5px solid var(--charcoal);
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 10000;
+      transition: transform 0.15s ease-out, opacity 0.15s ease-out, width 0.2s ease, height 0.2s ease, border-color 0.2s ease;
+      mix-blend-mode: difference;
+    }
+    .cursor.hovering {
+      width: 48px;
+      height: 48px;
+      background: rgba(192, 122, 95, 0.15);
+      border-color: var(--terracotta);
+    }
+
+    /* ---- Scroll Reveal Base ---- */
+    .reveal {
+      opacity: 0;
+      transform: translateY(40px);
+      transition: opacity 0.9s cubic-bezier(0.22, 1, 0.36, 1), transform 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .reveal.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* ---- Navigation ---- */
+    nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      padding: 2rem 4vw;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 100;
+      background: rgba(247, 244, 240, 0.7);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid rgba(30, 28, 26, 0.05);
+      opacity: 0;
+      transform: translateY(-100%);
+      animation: navSlide 1s cubic-bezier(0.22, 1, 0.36, 1) 2.2s forwards;
+    }
+
+    @keyframes navSlide {
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .logo {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.6rem;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--charcoal);
+      position: relative;
+      cursor: none;
+    }
+    .logo::after {
+      content: '';
+      position: absolute;
+      bottom: -4px;
+      left: 0;
+      width: 100%;
+      height: 1px;
+      background: var(--terracotta);
+      transform: scaleX(0);
+      transform-origin: right;
+      transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .logo:hover::after {
+      transform: scaleX(1);
+      transform-origin: left;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 3rem;
+      list-style: none;
+    }
+    .nav-links a {
+      text-decoration: none;
+      color: var(--charcoal);
+      font-size: 0.82rem;
+      font-weight: 400;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      position: relative;
+      padding-bottom: 4px;
+      cursor: none;
+    }
+    .nav-links a::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 1px;
+      background: var(--gold);
+      transform: scaleX(0);
+      transform-origin: left;
+      transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .nav-links a:hover::after {
+      transform: scaleX(1);
+      transform-origin: right;
+    }
+
+    .nav-cta {
+      padding: 0.7rem 2rem;
+      background: var(--charcoal);
+      color: var(--cream);
+      border: none;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.78rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      cursor: none;
+      position: relative;
+      overflow: hidden;
+      transition: color 0.4s ease;
+    }
+    .nav-cta::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: var(--terracotta);
+      transform: translateX(-101%);
+      transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .nav-cta:hover::before {
+      transform: translateX(0);
+    }
+    .nav-cta span {
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ---- Hero ---- */
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      padding: 0 8vw;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero-content {
+      max-width: 55vw;
+      position: relative;
+      z-index: 2;
+    }
+
+    .hero-label {
+      font-size: 0.75rem;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: var(--stone);
+      margin-bottom: 2rem;
+      opacity: 0;
+      display: inline-block;
+      animation: fadeSlideUp 1s cubic-bezier(0.22, 1, 0.36, 1) 0.4s forwards;
+    }
+
+    .hero-label::before {
+      content: '';
+      display: inline-block;
+      width: 32px;
+      height: 1px;
+      background: var(--stone);
+      vertical-align: middle;
+      margin-right: 1rem;
+      opacity: 0;
+      animation: lineExpand 0.8s cubic-bezier(0.22, 1, 0.36, 1) 0.6s forwards;
+    }
+
+    @keyframes lineExpand {
+      from { width: 0; opacity: 0; }
+      to { width: 32px; opacity: 1; }
+    }
+
+    .hero-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: clamp(3rem, 7vw, 6.5rem);
+      font-weight: 300;
+      line-height: 1.05;
+      color: var(--charcoal);
+      margin-bottom: 2rem;
+      overflow: hidden;
+    }
+
+    .hero-title .word {
+      display: inline-block;
+      overflow: hidden;
+      vertical-align: top;
+    }
+    .hero-title .word-inner {
+      display: inline-block;
+      transform: translateY(110%);
+      animation: textReveal 1.2s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    }
+    @keyframes textReveal {
+      to { transform: translateY(0); }
+    }
+
+    .hero-title .word:nth-child(1) .word-inner { animation-delay: 0.7s; }
+    .hero-title .word:nth-child(2) .word-inner { animation-delay: 0.85s; }
+    .hero-title .word:nth-child(3) .word-inner { animation-delay: 1.0s; }
+    .hero-title .word:nth-child(4) .word-inner { animation-delay: 1.15s; }
+
+    .hero-title em {
+      font-style: italic;
+      color: var(--terracotta);
+    }
+
+    .hero-desc {
+      font-size: 1.05rem;
+      line-height: 1.75;
+      color: var(--stone);
+      max-width: 420px;
+      margin-bottom: 3rem;
+      opacity: 0;
+      animation: fadeSlideUp 1s cubic-bezier(0.22, 1, 0.36, 1) 1.5s forwards;
+    }
+
+    @keyframes fadeSlideUp {
+      from { opacity: 0; transform: translateY(30px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .hero-cta-group {
+      display: flex;
+      gap: 1.5rem;
+      align-items: center;
+      opacity: 0;
+      animation: fadeSlideUp 1s cubic-bezier(0.22, 1, 0.36, 1) 1.7s forwards;
+    }
+
+    .btn-primary {
+      padding: 1rem 2.8rem;
+      background: var(--charcoal);
+      color: var(--cream);
+      border: none;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.82rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      cursor: none;
+      position: relative;
+      overflow: hidden;
+      transition: color 0.4s ease;
+    }
+    .btn-primary::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: var(--terracotta);
+      transform: translateX(-101%);
+      transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .btn-primary:hover::before {
+      transform: translateX(0);
+    }
+    .btn-primary span {
+      position: relative;
+      z-index: 1;
+    }
+
+    .btn-text {
+      font-size: 0.82rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--charcoal);
+      text-decoration: none;
+      position: relative;
+      padding-bottom: 3px;
+      cursor: none;
+    }
+    .btn-text::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 1px;
+      background: var(--charcoal);
+      transform: scaleX(0);
+      transform-origin: left;
+      transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .btn-text:hover::after {
+      transform: scaleX(1);
+      transform-origin: right;
+    }
+
+    /* Hero Decorative Image */
+    .hero-image {
+      position: absolute;
+      right: -5vw;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 45vw;
+      max-width: 650px;
+      aspect-ratio: 4/5;
+      overflow: hidden;
+      opacity: 0;
+      animation: heroImageIn 1.6s cubic-bezier(0.22, 1, 0.36, 1) 1.2s forwards;
+    }
+    @keyframes heroImageIn {
+      from { opacity: 0; transform: translateY(-45%) scale(1.1); clip-path: inset(0 0 100% 0); }
+      to { opacity: 1; transform: translateY(-50%) scale(1); clip-path: inset(0 0 0% 0); }
+    }
+    .hero-image img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transform: scale(1.05);
+      transition: transform 8s ease-out;
+    }
+    .hero-image:hover img {
+      transform: scale(1);
+    }
+    .hero-image::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border: 1px solid rgba(30, 28, 26, 0.1);
+      pointer-events: none;
+    }
+
+    /* Organic shape behind hero image */
+    .hero-blob {
+      position: absolute;
+      right: -8vw;
+      top: 40%;
+      width: 55vw;
+      height: 35vw;
+      background: linear-gradient(135deg, var(--linen), var(--cream));
+      border-radius: 45% 55% 35% 65% / 55% 45% 55% 45%;
+      z-index: 0;
+      opacity: 0;
+      animation: fadeIn 2s ease 0.2s forwards;
+    }
+    @keyframes fadeIn {
+      to { opacity: 1; }
+    }
+
+    /* Scrolldown indicator */
+    .scrolldown {
+      position: absolute;
+      bottom: 3rem;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+      opacity: 0;
+      animation: fadeSlideUp 1s ease 2.5s forwards;
+    }
+    .scrolldown span {
+      font-size: 0.65rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--stone);
+    }
+    .scrolldown-bar {
+      width: 1px;
+      height: 48px;
+      background: linear-gradient(to bottom, var(--stone), transparent);
+      overflow: hidden;
+    }
+    .scrolldown-bar::after {
+      content: '';
+      display: block;
+      width: 100%;
+      height: 16px;
+      background: var(--terracotta);
+      animation: scrollPulse 1.8s ease-in-out infinite;
+    }
+    @keyframes scrollPulse {
+      0%, 100% { transform: translateY(-100%); }
+      50% { transform: translateY(200%); }
+    }
+
+    /* ---- Slider Section ---- */
+    .slider-section {
+      padding: 10rem 0;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .slider-header {
+      padding: 0 8vw;
+      margin-bottom: 4rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+    }
+
+    .slider-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: clamp(2rem, 4vw, 3.5rem);
+      font-weight: 300;
+      line-height: 1.1;
+    }
+    .slider-title em {
+      font-style: italic;
+      color: var(--terracotta);
+    }
+
+    .slider-nav {
+      display: flex;
+      gap: 1rem;
+    }
+
+    .slider-arrow {
+      width: 56px;
+      height: 56px;
+      border: 1px solid var(--charcoal);
+      background: transparent;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: none;
+      transition: all 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+      position: relative;
+      overflow: hidden;
+    }
+    .slider-arrow::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: var(--charcoal);
+      transform: scale(0);
+      border-radius: 50%;
+      transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .slider-arrow:hover::before {
+      transform: scale(2);
+    }
+    .slider-arrow:hover {
+      border-color: var(--charcoal);
+    }
+    .slider-arrow svg {
+      width: 20px;
+      height: 20px;
+      position: relative;
+      z-index: 1;
+      transition: stroke 0.4s ease;
+      stroke: var(--charcoal);
+    }
+    .slider-arrow:hover svg {
+      stroke: var(--cream);
+    }
+
+    .slider-track-wrap {
+      position: relative;
+      width: 100%;
+      overflow: hidden;
+    }
+
+    .slider-track {
+      display: flex;
+      gap: 2rem;
+      padding: 0 8vw;
+      transition: transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+      cursor: grab;
+    }
+    .slider-track.grabbing {
+      cursor: grabbing;
+      transition: none;
+    }
+
+    .slide {
+      flex: 0 0 30vw;
+      min-width: 280px;
+      max-width: 480px;
+      position: relative;
+    }
+    .slide-visual {
+      width: 100%;
+      aspect-ratio: 3/4;
+      background: var(--linen);
+      overflow: hidden;
+      position: relative;
+      margin-bottom: 1.5rem;
+    }
+    .slide-visual img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transform: scale(1.1);
+      transition: transform 8s ease-out;
+    }
+    .slide:hover .slide-visual img {
+      transform: scale(1);
+    }
+    .slide-visual::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border: 1px solid rgba(30, 28, 26, 0.08);
+    }
+    .slide-number {
+      position: absolute;
+      top: 1.5rem;
+      right: 1.5rem;
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 0.9rem;
+      font-style: italic;
+      color: var(--cream);
+      mix-blend-mode: difference;
+      z-index: 2;
+    }
+    .slide-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.4rem;
+      font-weight: 400;
+      margin-bottom: 0.3rem;
+    }
+    .slide-meta {
+      font-size: 0.78rem;
+      color: var(--stone);
+      letter-spacing: 0.05em;
+    }
+
+    /* ---- About Section ---- */
+    .about {
+      padding: 10rem 8vw;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6rem;
+      align-items: center;
+      background: var(--deep-clay);
+      color: var(--cream);
+      position: relative;
+      overflow: hidden;
+    }
+    .about-blob {
+      position: absolute;
+      left: -10vw;
+      top: -20vh;
+      width: 45vw;
+      height: 45vw;
+      background: radial-gradient(circle, rgba(192, 122, 95, 0.12), transparent 70%);
+      border-radius: 50%;
+    }
+
+    .about-image {
+      width: 100%;
+      aspect-ratio: 1;
+      overflow: hidden;
+      position: relative;
+    }
+    .about-image img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .about-image::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border: 1px solid rgba(247, 244, 240, 0.12);
+    }
+
+    .about-content h2 {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: clamp(2rem, 3.5vw, 3rem);
+      font-weight: 300;
+      line-height: 1.15;
+      margin-bottom: 2rem;
+    }
+    .about-content h2 em {
+      font-style: italic;
+      color: var(--terracotta);
+    }
+    .about-content p {
+      font-size: 0.95rem;
+      line-height: 1.8;
+      color: rgba(247, 244, 240, 0.7);
+      margin-bottom: 1.5rem;
+    }
+    .about-cta {
+      display: inline-block;
+      padding: 0.9rem 2.4rem;
+      border: 1px solid rgba(247, 244, 240, 0.25);
+      color: var(--cream);
+      text-decoration: none;
+      font-size: 0.78rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      transition: all 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+      margin-top: 1rem;
+      cursor: none;
+      position: relative;
+      overflow: hidden;
+    }
+    .about-cta::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: var(--cream);
+      transform: translateX(-101%);
+      transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .about-cta:hover {
+      color: var(--charcoal);
+      border-color: var(--cream);
+    }
+    .about-cta:hover::before {
+      transform: translateX(0);
+    }
+    .about-cta span {
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ---- CTA Band ---- */
+    .cta-band {
+      padding: 6rem 8vw;
+      text-align: center;
+      background: var(--cream);
+      position: relative;
+    }
+    .cta-band h2 {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: clamp(2rem, 4vw, 3.5rem);
+      font-weight: 300;
+      margin-bottom: 1.5rem;
+    }
+    .cta-band h2 em {
+      font-style: italic;
+      color: var(--terracotta);
+    }
+    .cta-band p {
+      font-size: 1rem;
+      color: var(--stone);
+      max-width: 500px;
+      margin: 0 auto 2.5rem;
+      line-height: 1.7;
+    }
+
+    /* ---- Popup Modal ---- */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(30, 28, 26, 0.4);
+      backdrop-filter: blur(18px) saturate(1.2);
+      z-index: 1000;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.5s ease, visibility 0.5s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-backdrop.active {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .modal-panel {
+      background: var(--cream);
+      padding: 3.5rem;
+      max-width: 480px;
+      width: 90vw;
+      position: relative;
+      transform: scale(0.95) translateY(20px);
+      opacity: 0;
+      transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.5s ease;
+      border: 1px solid rgba(30, 28, 26, 0.08);
+    }
+    .modal-backdrop.active .modal-panel {
+      transform: scale(1) translateY(0);
+      opacity: 1;
+    }
+
+    .modal-close {
+      position: absolute;
+      top: 1.5rem;
+      right: 1.5rem;
+      width: 40px;
+      height: 40px;
+      border: 1px solid rgba(30, 28, 26, 0.15);
+      background: transparent;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: none;
+      transition: background 0.3s ease, border-color 0.3s ease;
+    }
+    .modal-close:hover {
+      background: var(--charcoal);
+      border-color: var(--charcoal);
+    }
+    .modal-close svg {
+      width: 14px;
+      height: 14px;
+      stroke: var(--charcoal);
+      transition: stroke 0.3s ease;
+    }
+    .modal-close:hover svg {
+      stroke: var(--cream);
+    }
+
+    .modal-panel h3 {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 2rem;
+      font-weight: 400;
+      margin-bottom: 0.8rem;
+    }
+    .modal-panel p {
+      color: var(--stone);
+      font-size: 0.92rem;
+      line-height: 1.65;
+      margin-bottom: 2rem;
+    }
+
+    .modal-form input {
+      width: 100%;
+      padding: 1rem 0;
+      border: none;
+      border-bottom: 1px solid rgba(30, 28, 26, 0.2);
+      background: transparent;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.9rem;
+      outline: none;
+      transition: border-color 0.3s ease;
+      margin-bottom: 1.2rem;
+    }
+    .modal-form input:focus {
+      border-color: var(--terracotta);
+    }
+    .modal-form input::placeholder {
+      color: var(--stone);
+      font-size: 0.85rem;
+    }
+    .modal-form button {
+      width: 100%;
+      padding: 1rem;
+      background: var(--charcoal);
+      color: var(--cream);
+      border: none;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.82rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      cursor: none;
+      margin-top: 0.5rem;
+      position: relative;
+      overflow: hidden;
+      transition: color 0.4s ease;
+    }
+    .modal-form button::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: var(--terracotta);
+      transform: translateX(-101%);
+      transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .modal-form button:hover::before {
+      transform: translateX(0);
+    }
+    .modal-form button span {
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ---- Footer ---- */
+    footer {
+      padding: 4rem 8vw;
+      background: var(--charcoal);
+      color: var(--cream);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    footer .logo {
+      color: var(--cream);
+      font-size: 1.3rem;
+    }
+    footer .logo::after {
+      background: var(--terracotta);
+    }
+    footer small {
+      font-size: 0.78rem;
+      color: rgba(247, 244, 240, 0.4);
+      letter-spacing: 0.05em;
+    }
+
+    /* ---- Divider Line ---- */
+    .divider {
+      width: 60px;
+      height: 1px;
+      background: var(--terracotta);
+      margin: 2rem 0;
+    }
+
+    /* ---- Responsive ---- */
+    @media (max-width: 900px) {
+      body { cursor: auto; }
+      .cursor { display: none; }
+      .nav-links { display: none; }
+      .hero { flex-direction: column; padding-top: 8rem; }
+      .hero-content { max-width: 100%; }
+      .hero-image { position: relative; right: auto; top: auto; transform: none; width: 100%; margin-top: 4rem; }
+      .hero-blob { display: none; }
+      .about { grid-template-columns: 1fr; gap: 3rem; padding: 6rem 8vw; }
+      .slide { flex: 0 0 70vw; }
+      .slider-header { flex-direction: column; align-items: flex-start; gap: 1.5rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="noise-overlay"></div>
+  <div class="cursor" id="cursor"></div>
+
+  <nav>
+    <div class="logo">Toha</div>
+    <ul class="nav-links">
+      <li><a href="#beranda">Beranda</a></li>
+      <li><a href="#galeri">Galeri</a></li>
+      <li><a href="#tentang">Tentang</a></li>
+    </ul>
+    <button class="nav-cta" onclick="openModal()"><span>Kontak</span></button>
+  </nav>
+
+  <section class="hero" id="beranda">
+    <div class="hero-blob"></div>
+    <div class="hero-content">
+      <div class="hero-label">Karya Tangan</div>
+      <h1 class="hero-title">
+        <span class="word"><span class="word-inner">Keindahan</span></span>
+        <span class="word"><span class="word-inner">dalam</span></span>
+        <span class="word"><span class="word-inner">setiap</span></span><br>
+        <span class="word"><span class="word-inner"><em>garis &amp; warna</em></span></span>
+      </h1>
+      <p class="hero-desc">
+        Sebuah studio yang menggabungkan tradisi kerajinan dengan sentuhan modern. 
+        Setiap karya dikerjakan dengan tangan dan hati, untuk ruang yang bermakna.
+      </p>
+      <div class="hero-cta-group">
+        <button class="btn-primary" onclick="openModal()"><span>Jelajahi Karya</span></button>
+        <a href="#galeri" class="btn-text">Lihat Selengkapnya</a>
+      </div>
+    </div>
+    <div class="hero-image">
+      <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=700&h=875&fit=crop&q=80" alt="Artisan at work" loading="eager">
+    </div>
+    <div class="scrolldown">
+      <span>Gulir</span>
+      <div class="scrolldown-bar"></div>
+    </div>
+  </section>
+
+  <section class="slider-section" id="galeri">
+    <div class="slider-header">
+      <h2 class="slider-title reveal">
+        Koleksi <em>Terbaru</em>
+      </h2>
+      <div class="slider-nav">
+        <button class="slider-arrow slider-prev" aria-label="Sebelumnya">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        </button>
+        <button class="slider-arrow slider-next" aria-label="Selanjutnya">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="slider-track-wrap">
+      <div class="slider-track" id="sliderTrack">
+        <div class="slide">
+          <div class="slide-visual">
+            <span class="slide-number">01</span>
+            <img src="https://images.unsplash.com/photo-1513519245088-0e12902e35a6?w=600&h=800&fit=crop&q=80" alt="Karya 1" loading="lazy">
+          </div>
+          <h3 class="slide-title">Harmoni Tanah</h3>
+          <p class="slide-meta">Keramik &middot; 2024</p>
+        </div>
+        <div class="slide">
+          <div class="slide-visual">
+            <span class="slide-number">02</span>
+            <img src="https://images.unsplash.com/photo-1504198458649-3128b932f49e?w=600&h=800&fit=crop&q=80" alt="Karya 2" loading="lazy">
+          </div>
+          <h3 class="slide-title">Lukisan Angin</h3>
+          <p class="slide-meta">Akrilik di kanvas &middot; 2024</p>
+        </div>
+        <div class="slide">
+          <div class="slide-visual">
+            <span class="slide-number">03</span>
+            <img src="https://images.unsplash.com/photo-1516975080664-ed2fc6a32937?w=600&h=800&fit=crop&q=80" alt="Karya 3" loading="lazy">
+          </div>
+          <h3 class="slide-title">Anyaman Cahaya</h3>
+          <p class="slide-meta">Serat bambu &middot; 2023</p>
+        </div>
+        <div class="slide">
+          <div class="slide-visual">
+            <span class="slide-number">04</span>
+            <img src="https://images.unsplash.com/photo-1577083552431-6e5fd01aa342?w=600&h=800&fit=crop&q=80" alt="Karya 4" loading="lazy">
+          </div>
+          <h3 class="slide-title">Forma Abstrak</h3>
+          <p class="slide-meta">Sculpture kayu &middot; 2024</p>
+        </div>
+        <div class="slide">
+          <div class="slide-visual">
+            <span class="slide-number">05</span>
+            <img src="https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=600&h=800&fit=crop&q=80" alt="Karya 5" loading="lazy">
+          </div>
+          <h3 class="slide-title">Batik Kontemporer</h3>
+          <p class="slide-meta">Kain &amp; pewarna alam &middot; 2023</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="about" id="tentang">
+    <div class="about-blob"></div>
+    <div class="about-image reveal">
+      <img src="https://images.unsplash.com/photo-1473186505569-9c61870c11f9?w=600&h=600&fit=crop&q=80" alt="Studio interior" loading="lazy">
+    </div>
+    <div class="about-content reveal">
+      <h2><em>Tentang</em><br>Studio Toha</h2>
+      <div class="divider"></div>
+      <p>
+        Didirikan pada 2019, Studio Toha lahir dari keyakinan bahwa setiap benda harus 
+        memiliki jiwa. Kami menggabungkan teknik kerajinan tradisional Indonesia dengan 
+        estetika kontemporer — menciptakan karya yang tidak hanya indah dilihat, tapi juga 
+        bermakna digunakan.
+      </p>
+      <p>
+        Setiap selesai tidak sempurna. Itulah yang membuatnya manusiawi, dan itulah 
+        yang membuat karya kami unik.
+      </p>
+      <a class="about-cta" onclick="openModal()"><span>Cerita Lebih Lanjut</span></a>
+    </div>
+  </section>
+
+  <section class="cta-band">
+    <h2 class="reveal">Bergabung dengan <em>Perjalanan</em></h2>
+    <p class="reveal">Kirimkan pertanyaan atau pesanan khusus. Kami akan menghubungi Anda dalam beberapa hari.</p>
+    <div class="reveal">
+      <button class="btn-primary" onclick="openModal()"><span>Mulai Percakapan</span></button>
+    </div>
+  </section>
+
+  <footer>
+    <div class="logo">Toha</div>
+    <small>Handcrafted with intention.</small>
+  </footer>
+
+  <!-- Modal -->
+  <div class="modal-backdrop" id="modalBackdrop" onclick="closeModalOutside(event)">
+    <div class="modal-panel" onclick="event.stopPropagation()">
+      <button class="modal-close" onclick="closeModal()" aria-label="Tutup">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+      <h3>Mulai Karya Bersama</h3>
+      <p>Isi formulir singkat ini. Tim kami akan membaca setiap pesan dengan cermat.</p>
+      <form class="modal-form">
+        <input type="text" placeholder="Nama Anda" required>
+        <input type="email" placeholder="Email" required>
+        <input type="text" placeholder="Jenis karya yang diinginkan">
+        <button type="submit"><span>Kirim Pesan</span></button>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    /* ---- Custom Cursor ---- */
+    const cursor = document.getElementById('cursor');
+    let mouseX = 0, mouseY = 0;
+    let cursorX = 0, cursorY = 0;
+
+    if (window.matchMedia('(min-width: 901px)').matches) {
+      document.addEventListener('mousemove', e => {
+        mouseX = e.clientX;
+        mouseY = e.clientY;
+      });
+
+      function animateCursor() {
+        cursorX += (mouseX - cursorX) * 0.15;
+        cursorY += (mouseY - cursorY) * 0.15;
+        cursor.style.left = cursorX - 6 + 'px';
+        cursor.style.top = cursorY - 6 + 'px';
+        requestAnimationFrame(animateCursor);
+      }
+      animateCursor();
+
+      const hoverables = document.querySelectorAll('a, button, .slide');
+      hoverables.forEach(el => {
+        el.addEventListener('mouseenter', () => cursor.classList.add('hovering'));
+        el.addEventListener('mouseleave', () => cursor.classList.remove('hovering'));
+      });
+    }
+
+    /* ---- Scroll Reveal ---- */
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+        }
+      });
+    }, { threshold: 0.15, rootMargin: '0px 0px -50px 0px' });
+
+    document.querySelectorAll('.reveal').forEach(el => revealObserver.observe(el));
+
+    /* ---- Slider ---- */
+    const track = document.getElementById('sliderTrack');
+    const slides = track.querySelectorAll('.slide');
+    const prevBtn = document.querySelector('.slider-prev');
+    const nextBtn = document.querySelector('.slider-next');
+    let currentSlide = 0;
+    let slidesPerView = window.innerWidth < 901 ? 1 : 3;
+    let maxSlide = Math.max(0, slides.length - slidesPerView);
+
+    function updateSlider() {
+      const slideWidth = slides[0]?.offsetWidth + 32 || 0;
+      track.style.transform = `translateX(${-currentSlide * slideWidth}px)`;
+      prevBtn.style.opacity = currentSlide > 0 ? '1' : '0.4';
+      prevBtn.style.pointerEvents = currentSlide > 0 ? 'all' : 'none';
+      nextBtn.style.opacity = currentSlide < maxSlide ? '1' : '0.4';
+      nextBtn.style.pointerEvents = currentSlide < maxSlide ? 'all' : 'none';
+    }
+
+    nextBtn.addEventListener('click', () => {
+      if (currentSlide < maxSlide) { currentSlide++; updateSlider(); }
+    });
+    prevBtn.addEventListener('click', () => {
+      if (currentSlide > 0) { currentSlide--; updateSlider(); }
+    });
+
+    // Drag support
+    let isDragging = false;
+    let startX = 0;
+    let dragTranslate = 0;
+
+    track.addEventListener('mousedown', e => {
+      isDragging = true;
+      track.classList.add('grabbing');
+      startX = e.pageX;
+    });
+    window.addEventListener('mousemove', e => {
+      if (!isDragging) return;
+      const dx = e.pageX - startX;
+      const slideWidth = slides[0]?.offsetWidth + 32 || 0;
+      const offset = -currentSlide * slideWidth + dx;
+      track.style.transform = `translateX(${offset}px)`;
+    });
+    window.addEventListener('mouseup', e => {
+      if (!isDragging) return;
+      const dx = e.pageX - startX;
+      isDragging = false;
+      track.classList.remove('grabbing');
+      if (Math.abs(dx) > 50) {
+        if (dx < 0 && currentSlide < maxSlide) currentSlide++;
+        else if (dx > 0 && currentSlide > 0) currentSlide--;
+      }
+      updateSlider();
+    });
+
+    window.addEventListener('resize', () => {
+      slidesPerView = window.innerWidth < 901 ? 1 : 3;
+      maxSlide = Math.max(0, slides.length - slidesPerView);
+      if (currentSlide > maxSlide) currentSlide = maxSlide;
+      updateSlider();
+    });
+
+    // Initial state
+    updateSlider();
+
+    /* ---- Modal ---- */
+    const modalBackdrop = document.getElementById('modalBackdrop');
+    function openModal() {
+      modalBackdrop.classList.add('active');
+      document.body.style.overflow = 'hidden';
+    }
+    function closeModal() {
+      modalBackdrop.classList.remove('active');
+      document.body.style.overflow = '';
+    }
+    function closeModalOutside(event) {
+      if (event.target === modalBackdrop) closeModal();
+    }
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') closeModal();
+    });
+
+    /* ---- Smooth scroll for anchor links ---- */
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+      anchor.addEventListener('click', function (e) {
+        e.preventDefault();
+        document.querySelector(this.getAttribute('href')).scrollIntoView({
+          behavior: 'smooth'
+        });
+      });
+    });
+  </script>
+</body>
+</html>
