@@ -34,6 +34,8 @@
 #include "MAX30105.h"
 #include "heartRate.h"
 #include "spo2_algorithm.h"
+#include <ThreeWire.h>
+#include <RtcDS1302.h>
 
 // ====== PIN ESP32-2424S012 ======
 #define TFT_BL    3
@@ -55,14 +57,10 @@
 #define SENSOR_SDA TP_SDA
 #define SENSOR_SCL TP_SCL
 
-// ====== WIFI ======
-const char* apSsid   = "Toha-ESP32";
-const char* apPass   = "12345678";
-const char* ssid     = "GANTI_SSID";
-const char* password = "GANTI_PASSWORD";
-const long  gmtOffset_sec      = 7 * 3600;
-const int   daylightOffset_sec = 0;
-const char* ntpServer          = "pool.ntp.org";
+// ====== WIFI (AP mode only) ======
+const char* apSsid = "Toha-ESP32";
+const char* apPass = "12345678";
+const long  gmtOffset_sec = 7 * 3600;
 
 // ====== WEB SERVER ======
 WebServer server(80);
@@ -88,6 +86,13 @@ void onEspNowRecv(const uint8_t *mac, const uint8_t *data, int len) {
     lastEspnowMs = millis();
   }
 }
+
+// ====== DS1302 RTC ======
+#define DS1302_DAT 21
+#define DS1302_CLK  8
+#define DS1302_RST 20
+ThreeWire rtcWire(DS1302_DAT, DS1302_CLK, DS1302_RST);
+RtcDS1302<ThreeWire> rtc(rtcWire);
 
 // ====== SENSOR OBJECTS ======
 Adafruit_BMP085 bmp;
@@ -401,6 +406,12 @@ void handleApiSet() {
   time_t new_t = mktime(&tm_local);
   struct timeval tv = { new_t, 0 };
   settimeofday(&tv, NULL);
+
+  // Update DS1302 dari waktu yang di-set via HP
+  getLocalTime(&timeinfo);
+  RtcDateTime rtcDt(1900 + timeinfo.tm_year, timeinfo.tm_mon + 1, timeinfo.tm_mday,
+                    timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+  rtc.SetDateTime(rtcDt);
 
   ntpOK = true;
   Serial.printf("[HP] Set waktu: %02d:%02d:%02d\n", h, m, s);
@@ -802,11 +813,10 @@ void setup() {
   delay(20);
   Serial.println("[5/5] UI siap (Watchface)");
 
-  // WiFi AP + STA. AP dikunci channel 1 agar ESP-NOW match dgn pengirim.
-  // (Catatan: jika STA tersambung ke router di channel lain, channel ikut berubah
-  //  dan pengirim ESP-NOW perlu disetel ke channel router itu.)
+  // WiFi AP only — channel 1 agar ESP-NOW match dengan pengirim
   WiFi.mode(WIFI_AP_STA);
-  WiFi.softAP(apSsid, apPass, 1);
+  WiFi.setTxPower(WIFI_POWER_19_5dBm);  // boost TX power
+  WiFi.softAP(apSsid, apPass, 6);       // channel 6
   Serial.printf("AP SSID: %s  PASS: %s\n", apSsid, apPass);
   Serial.printf("AP IP  : %s\n", WiFi.softAPIP().toString().c_str());
 
@@ -819,35 +829,45 @@ void setup() {
     Serial.println("[ESP-NOW] init gagal");
   }
 
-  if (strcmp(ssid, "GANTI_SSID") != 0) {
-    WiFi.begin(ssid, password);
-    unsigned long t0 = millis();
-    while (WiFi.status() != WL_CONNECTED && millis() - t0 < 6000) {
-      delay(200);
-      lv_tick_handler();
-      lv_timer_handler();
-    }
-  }
-
-  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
-
-  if (WiFi.status() == WL_CONNECTED) {
-    Serial.printf("STA OK, IP: %s\n", WiFi.localIP().toString().c_str());
-    int retry = 0;
-    while (!getLocalTime(&timeinfo) && retry < 8) {
-      delay(400); retry++;
-    }
-    ntpOK = (retry < 8);
-  } else {
-    Serial.println("STA gagal - set waktu manual via HP");
-  }
-
   server.on("/",         HTTP_GET,  handleRoot);
   server.on("/api/time", HTTP_GET,  handleApiTime);
   server.on("/api/set",  HTTP_POST, handleApiSet);
   server.onNotFound([](){ server.send(404, "text/plain", "not found"); });
   server.begin();
   Serial.println("HTTP server: http://192.168.4.1/");
+
+  // DS1302 RTC init
+  rtc.Begin();
+  if (rtc.GetIsWriteProtected()) rtc.SetIsWriteProtected(false);
+  if (!rtc.GetIsRunning())        rtc.SetIsRunning(true);
+
+  if (ntpOK) {
+    // NTP berhasil -> simpan waktu ke DS1302
+    RtcDateTime dt(1900 + timeinfo.tm_year, timeinfo.tm_mon + 1, timeinfo.tm_mday,
+                   timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+    rtc.SetDateTime(dt);
+    Serial.println("[RTC] DS1302 diupdate dari NTP");
+  } else if (rtc.IsDateTimeValid()) {
+    // NTP gagal, ambil waktu dari DS1302
+    RtcDateTime dt = rtc.GetDateTime();
+    struct tm local_tm = {};
+    local_tm.tm_year  = dt.Year() - 1900;
+    local_tm.tm_mon   = dt.Month() - 1;
+    local_tm.tm_mday  = dt.Day();
+    local_tm.tm_hour  = dt.Hour();
+    local_tm.tm_min   = dt.Minute();
+    local_tm.tm_sec   = dt.Second();
+    local_tm.tm_isdst = 0;
+    time_t epoch = mktime(&local_tm);
+    struct timeval tv_rtc = { epoch, 0 };
+    settimeofday(&tv_rtc, NULL);
+    getLocalTime(&timeinfo);
+    ntpOK = true;
+    Serial.printf("[RTC] Waktu dari DS1302: %02d:%02d:%02d\n",
+                  dt.Hour(), dt.Minute(), dt.Second());
+  } else {
+    Serial.println("[RTC] DS1302 belum diset - gunakan HP untuk set waktu");
+  }
 
   if (!ntpOK) {
     timeinfo.tm_hour = 12;
