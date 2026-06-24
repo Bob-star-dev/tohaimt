@@ -413,6 +413,13 @@ void handleApiSet() {
                     timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
   rtc.SetDateTime(rtcDt);
 
+  // Verifikasi tulis balik
+  RtcDateTime check = rtc.GetDateTime();
+  Serial.printf("[RTC] Tulis: %02d:%02d:%02d | Baca balik: %02d:%02d:%02d | Valid: %d\n",
+                timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec,
+                check.Hour(), check.Minute(), check.Second(),
+                rtc.IsDateTimeValid());
+
   ntpOK = true;
   Serial.printf("[HP] Set waktu: %02d:%02d:%02d\n", h, m, s);
   server.send(200, "application/json", "{\"ok\":true}");
@@ -836,7 +843,8 @@ void setup() {
   server.begin();
   Serial.println("HTTP server: http://192.168.4.1/");
 
-  // DS1302 RTC init
+  // DS1302 RTC init — putus UART0 TX dari GPIO 21 agar bisa dipakai sebagai DAT
+  pinMatrixOutDetach(DS1302_DAT, false, false);
   rtc.Begin();
   if (rtc.GetIsWriteProtected()) rtc.SetIsWriteProtected(false);
   if (!rtc.GetIsRunning())        rtc.SetIsRunning(true);
